@@ -1,0 +1,180 @@
+### ==============================================================================
+### DAEA - SEMANA 15: API GATEWAY CON OCELOT Y MICROSERVICIOS
+### Tema: Serpentarios - Banco de Venenos y Especies
+### Puerto Gateway: http://localhost:5000
+### Puerto Microservicio 1 (13Serpentarios.Api): http://localhost:5055
+### Puerto Microservicio 2 (LaboratoriosApi): http://localhost:5056
+### ==============================================================================
+
+@gatewayUrl = http://localhost:5000
+@ms1Url = http://localhost:5055
+@ms2Url = http://localhost:5056
+
+### ------------------------------------------------------------------------------
+### 1. AUTENTICACIÓN (Rutas Públicas a través del Gateway)
+### ------------------------------------------------------------------------------
+
+### 1.1 Login con Herpetólogo (Rol: Herpetologo - Acceso total)
+# @name loginHerpetologo
+POST {{gatewayUrl}}/gateway/auth/login
+Content-Type: application/json
+
+{
+  "correo": "herpetologo@serpentario.pe",
+  "clave": "Clave123*"
+}
+
+### Guardar Token de Herpetólogo
+@tokenHerpetologo = {{loginHerpetologo.response.body.token}}
+
+### 1.2 Login con Técnico de Laboratorio (Rol: TecnicoLaboratorio)
+# @name loginTecnico
+POST {{gatewayUrl}}/gateway/auth/login
+Content-Type: application/json
+
+{
+  "correo": "laboratorio@serpentario.pe",
+  "clave": "Clave123*"
+}
+
+### Guardar Token de Técnico
+@tokenTecnico = {{loginTecnico.response.body.token}}
+
+### 1.3 Registro de nuevo usuario (201 Created - Rol TecnicoLaboratorio asignado por servidor)
+POST {{gatewayUrl}}/gateway/auth/registro
+Content-Type: application/json
+
+{
+  "correo": "investigador.demo@serpentario.pe",
+  "clave": "ClaveSegura2026*"
+}
+
+
+### ------------------------------------------------------------------------------
+### 2. PRUEBA: 200 OK (A través del Gateway)
+### ------------------------------------------------------------------------------
+
+### 2.1 GET Especies (Público - Sin token - 200 OK)
+GET {{gatewayUrl}}/gateway/especies
+
+### 2.2 GET Especie por Id (Público - Sin token - 200 OK)
+GET {{gatewayUrl}}/gateway/especies/1
+
+### 2.3 GET Microservicio 2: Laboratorios (Protegido - Con Token - 200 OK)
+GET {{gatewayUrl}}/gateway/laboratorios
+Authorization: Bearer {{tokenHerpetologo}}
+
+### 2.4 GET Microservicio 2: Laboratorio por ID (Protegido - Con Token - 200 OK)
+GET {{gatewayUrl}}/gateway/laboratorios/1
+Authorization: Bearer {{tokenHerpetologo}}
+
+
+### ------------------------------------------------------------------------------
+### 3. PRUEBA: 201 CREATED (A través del Gateway)
+### ------------------------------------------------------------------------------
+
+### 3.1 POST Especie (Requiere Rol Herpetologo - 201 Created)
+POST {{gatewayUrl}}/gateway/especies
+Content-Type: application/json
+Authorization: Bearer {{tokenHerpetologo}}
+
+{
+  "nombreCientifico": "Lachesis muta rhombeata",
+  "nombreComun": "Shushupe Muda",
+  "familia": "Viperidae",
+  "regionOrigen": "Selva Alta y Cordillera Azul",
+  "tipoVenenoDominante": "Proteolítico y Hemorrágico",
+  "nivelPeligrosidad": 5,
+  "activa": true
+}
+
+
+### ------------------------------------------------------------------------------
+### 4. PRUEBA: 204 NO CONTENT (A través del Gateway)
+### ------------------------------------------------------------------------------
+
+### 4.1 PUT Especie (Requiere Rol Herpetologo - 204 No Content)
+PUT {{gatewayUrl}}/gateway/especies/1
+Content-Type: application/json
+Authorization: Bearer {{tokenHerpetologo}}
+
+{
+  "nombreCientifico": "Bothrops atrox",
+  "nombreComun": "Jergón de la Selva (Actualizado)",
+  "familia": "Viperidae",
+  "regionOrigen": "Amazonía Peruana",
+  "tipoVenenoDominante": "Hemorrágico y Necrotizante",
+  "nivelPeligrosidad": 5,
+  "activa": true
+}
+  "familia": "Viperidae",
+  "nivelPeligrosidad": 5,
+  "descripcionVeneno": "Veneno hemotóxico severo, necrotizante y coagulante.",
+  "activa": true
+}
+
+
+### ------------------------------------------------------------------------------
+### 5. PRUEBA: 401 UNAUTHORIZED (Validación de Token en Gateway y Servicio)
+### ------------------------------------------------------------------------------
+
+### 5.1 Llamar a Microservicio 2 a través del Gateway SIN TOKEN (401 Unauthorized por Gateway)
+GET {{gatewayUrl}}/gateway/laboratorios
+
+### 5.2 Llamar a ruta de escritura de Especies a través del Gateway SIN TOKEN (401 Unauthorized por Gateway)
+POST {{gatewayUrl}}/gateway/especies
+Content-Type: application/json
+
+{
+  "nombreComun": "Falsa Coral",
+  "nombreCientifico": "Oxyrhopus melanogenys",
+  "familia": "Colubridae",
+  "nivelPeligrosidad": 1
+}
+
+### 5.3 Llamada DIRECTA al Microservicio 2 SIN TOKEN (401 Unauthorized por Microservicio 2)
+### Requisito explícito de la guía: "Llama directamente al microservicio 2 sin token y comprueba que responde 401"
+GET {{ms2Url}}/api/laboratorios
+
+
+### ------------------------------------------------------------------------------
+### 6. PRUEBA: 403 FORBIDDEN (Validación de Rol en Microservicio Downstream)
+### ------------------------------------------------------------------------------
+
+### 6.1 Intentar crear especie usando Token de TecnicoLaboratorio (403 Forbidden por la API)
+### El Gateway valida el token JWT con éxito (200), pero la API downstream exige Rol "Herpetologo"
+POST {{gatewayUrl}}/gateway/especies
+Content-Type: application/json
+Authorization: Bearer {{tokenTecnico}}
+
+{
+  "nombreComun": "Serpiente Coralina",
+  "nombreCientifico": "Micrurus surinamensis",
+  "familia": "Elapidae",
+  "nivelPeligrosidad": 4
+}
+
+
+### ------------------------------------------------------------------------------
+### 7. PRUEBA: 404 NOT FOUND (A través del Gateway)
+### ------------------------------------------------------------------------------
+
+### 7.1 Consultar especie inexistente (404 Not Found)
+GET {{gatewayUrl}}/gateway/especies/99999
+
+### 7.2 Consultar laboratorio inexistente con token válido (404 Not Found)
+GET {{gatewayUrl}}/gateway/laboratorios/99999
+Authorization: Bearer {{tokenHerpetologo}}
+
+
+### ------------------------------------------------------------------------------
+### 8. PRUEBA: 502 BAD GATEWAY (Tolerancia a Fallos y Detención de Microservicio 2)
+### ------------------------------------------------------------------------------
+
+### 8.1 Detén la terminal del Microservicio 2 (LaboratoriosApi) y ejecuta esta petición:
+### El Gateway responde 502 Bad Gateway indicando que el servicio downstream no está disponible.
+GET {{gatewayUrl}}/gateway/laboratorios
+Authorization: Bearer {{tokenHerpetologo}}
+
+### 8.2 Mientras el Microservicio 2 está caído, verifica que el Microservicio 1 sigue funcionando:
+GET {{gatewayUrl}}/gateway/especies

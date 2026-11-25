@@ -1,0 +1,15 @@
+bin/
+obj/
+publish/
+logs/
+*.zip
+.vs/
+*.user
+*.suo
+*.cache
+*.pubxml
+*.pubxml.user
+*.PublishSettings
+*.docx
+appsettings.Development.json
+appsettings.Production.json

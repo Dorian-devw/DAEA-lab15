@@ -1,0 +1,241 @@
+@baseUrl = http://localhost:5158
+
+### ============================================================================
+### BLOQUE 1: AUTENTICACIÓN (AuthController)
+### ============================================================================
+
+### 1.1 Registro de nuevo usuario (201 Created)
+# El servidor asigna automáticamente el rol inicial del negocio (TecnicoLaboratorio)
+# @name registroValido
+POST {{baseUrl}}/api/auth/registro
+Content-Type: application/json
+
+{
+  "correo": "analista1@serpentario.pe",
+  "clave": "ClaveSegura123*"
+}
+
+### 1.2 Registro con correo duplicado (409 Conflict)
+POST {{baseUrl}}/api/auth/registro
+Content-Type: application/json
+
+{
+  "correo": "analista1@serpentario.pe",
+  "clave": "OtraClave123*"
+}
+
+### 1.3 Registro con datos inválidos - clave muy corta / correo inválido (400 BadRequest)
+POST {{baseUrl}}/api/auth/registro
+Content-Type: application/json
+
+{
+  "correo": "correo-no-valido",
+  "clave": "123"
+}
+
+### 1.4 Login exitoso (200 OK) -> Copiar el token recibido para las siguientes pruebas
+# @name loginHerpetologo
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "correo": "herpetologo@serpentario.pe",
+  "clave": "Clave123*"
+}
+
+### Guardar token del Herpetologo (si usas REST Client o Thunder Client):
+@tokenHerpetologo = {{loginHerpetologo.response.body.token}}
+
+### 1.5 Login exitoso como TecnicoLaboratorio (200 OK)
+# @name loginLaboratorio
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "correo": "laboratorio@serpentario.pe",
+  "clave": "Clave123*"
+}
+
+@tokenLaboratorio = {{loginLaboratorio.response.body.token}}
+
+### 1.6 Login con credenciales inválidas (401 Unauthorized)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "correo": "herpetologo@serpentario.pe",
+  "clave": "ClaveEquivocada999*"
+}
+
+### 1.7 Login con correo inexistente (401 Unauthorized - Mismo código por seguridad)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "correo": "fantasma@serpentario.pe",
+  "clave": "ClaveCualquiera"
+}
+
+### 1.8 GET perfil sin token (401 Unauthorized)
+GET {{baseUrl}}/api/auth/perfil
+Accept: application/json
+
+### 1.9 GET perfil con token válido (200 OK) - Lee Claims del token directamente
+GET {{baseUrl}}/api/auth/perfil
+Accept: application/json
+Authorization: Bearer {{tokenHerpetologo}}
+
+
+### ============================================================================
+### BLOQUE 2: ESPECIES (EspeciesController) - Matriz de permisos
+### ============================================================================
+
+### 2.1 GET todas las especies - Público sin token (200 OK)
+GET {{baseUrl}}/api/especies
+Accept: application/json
+
+### 2.2 GET especie por ID - Público sin token (200 OK)
+GET {{baseUrl}}/api/especies/1
+Accept: application/json
+
+### 2.3 GET especie inexistente (404 NotFound)
+GET {{baseUrl}}/api/especies/9999
+Accept: application/json
+
+### 2.4 GET lotes anidados de especie sin token (401 Unauthorized)
+GET {{baseUrl}}/api/especies/1/lotes
+Accept: application/json
+
+### 2.5 GET lotes anidados de especie con token (200 OK)
+GET {{baseUrl}}/api/especies/1/lotes
+Accept: application/json
+Authorization: Bearer {{tokenLaboratorio}}
+
+### 2.6 POST crear especie SIN token (401 Unauthorized)
+POST {{baseUrl}}/api/especies
+Content-Type: application/json
+
+{
+  "nombreCientifico": "Lachesis muta",
+  "nombreComun": "Shushupe",
+  "familia": "Viperidae",
+  "regionOrigen": "Selva Alta",
+  "tipoVenenoDominante": "Proteolítico",
+  "nivelPeligrosidad": 5,
+  "activa": true
+}
+
+### 2.7 POST crear especie con rol NO autorizado TecnicoLaboratorio (403 Forbidden)
+POST {{baseUrl}}/api/especies
+Content-Type: application/json
+Authorization: Bearer {{tokenLaboratorio}}
+
+{
+  "nombreCientifico": "Lachesis muta",
+  "nombreComun": "Shushupe",
+  "familia": "Viperidae",
+  "regionOrigen": "Selva Alta",
+  "tipoVenenoDominante": "Proteolítico",
+  "nivelPeligrosidad": 5,
+  "activa": true
+}
+
+### 2.8 POST crear especie con rol AUTORIZADO Herpetologo (201 Created)
+POST {{baseUrl}}/api/especies
+Content-Type: application/json
+Authorization: Bearer {{tokenHerpetologo}}
+
+{
+  "nombreCientifico": "Crotalus durissus",
+  "nombreComun": "Cascabel tropical",
+  "familia": "Viperidae",
+  "regionOrigen": "Sudamérica",
+  "tipoVenenoDominante": "Neurotóxico",
+  "nivelPeligrosidad": 5,
+  "activa": true
+}
+
+### 2.9 DELETE especie con rol NO autorizado TecnicoLaboratorio (403 Forbidden)
+DELETE {{baseUrl}}/api/especies/1
+Authorization: Bearer {{tokenLaboratorio}}
+
+### 2.10 DELETE especie con rol AUTORIZADO Herpetologo pero con lotes asociados (409 Conflict)
+DELETE {{baseUrl}}/api/especies/1
+Authorization: Bearer {{tokenHerpetologo}}
+
+
+### ============================================================================
+### BLOQUE 3: LOTES DE VENENO (LotesVenenoController) - Matriz de permisos
+### ============================================================================
+
+### 3.1 GET lotes de veneno SIN token (401 Unauthorized)
+GET {{baseUrl}}/api/lotesveneno
+Accept: application/json
+
+### 3.2 GET lotes de veneno CON token (200 OK)
+GET {{baseUrl}}/api/lotesveneno
+Accept: application/json
+Authorization: Bearer {{tokenLaboratorio}}
+
+### 3.3 GET lote por ID con token (200 OK)
+GET {{baseUrl}}/api/lotesveneno/1
+Accept: application/json
+Authorization: Bearer {{tokenHerpetologo}}
+
+### 3.4 POST registrar lote de veneno con rol Herpetologo o TecnicoLaboratorio (201 Created)
+POST {{baseUrl}}/api/lotesveneno
+Content-Type: application/json
+Authorization: Bearer {{tokenHerpetologo}}
+
+{
+  "codigoLote": "LOT-2026-N99",
+  "especieId": 1,
+  "fechaExtraccion": "2026-11-18",
+  "fechaVencimiento": "2028-11-18",
+  "cantidadMiligramos": 450.00,
+  "purezaPorcentaje": 96.50,
+  "presentacion": "Liofilizado",
+  "temperaturaAlmacenamientoC": -20.00,
+  "estadoCalidad": "En Cuarentena",
+  "usoDestino": "Investigación Sueros Antiofídicos",
+  "observaciones": "Lote de prueba S14"
+}
+
+### 3.5 PUT actualizar lote con rol AUTORIZADO TecnicoLaboratorio (204 NoContent)
+PUT {{baseUrl}}/api/lotesveneno/1
+Content-Type: application/json
+Authorization: Bearer {{tokenLaboratorio}}
+
+{
+  "cantidadMiligramos": 350.00,
+  "purezaPorcentaje": 98.00,
+  "presentacion": "Liofilizado",
+  "temperaturaAlmacenamientoC": -20.00,
+  "estadoCalidad": "Aprobado",
+  "usoDestino": "Producción Antiveneno",
+  "observaciones": "Control de calidad verificado por laboratorio"
+}
+
+### 3.6 PUT actualizar lote con rol NO autorizado Herpetologo (403 Forbidden)
+# (El control de calidad es exclusivo de TecnicoLaboratorio)
+PUT {{baseUrl}}/api/lotesveneno/1
+Content-Type: application/json
+Authorization: Bearer {{tokenHerpetologo}}
+
+{
+  "cantidadMiligramos": 350.00,
+  "purezaPorcentaje": 98.00,
+  "presentacion": "Liofilizado",
+  "temperaturaAlmacenamientoC": -20.00,
+  "estadoCalidad": "Aprobado",
+  "usoDestino": "Producción Antiveneno",
+  "observaciones": "Intento de actualización por herpetólogo"
+}
+
+### 3.7 DELETE lote con rol NO autorizado TecnicoLaboratorio (403 Forbidden)
+DELETE {{baseUrl}}/api/lotesveneno/1
+Authorization: Bearer {{tokenLaboratorio}}
+
+### 3.8 DELETE lote con rol AUTORIZADO Herpetologo (204 NoContent) - Ajustar ID si es necesario
+DELETE {{baseUrl}}/api/lotesveneno/999
+Authorization: Bearer {{tokenHerpetologo}}
