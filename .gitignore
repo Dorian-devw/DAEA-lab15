@@ -11,5 +11,6 @@ logs/
 *.pubxml.user
 *.PublishSettings
 *.docx
+*.ps1
 appsettings.Development.json
 appsettings.Production.json
